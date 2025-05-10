@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicação de Mensagens Seguras</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .user-select {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .user-select button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .user-select button.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #0056b3;
+        }
+        .message-area {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .message-input {
+            display: flex;
+            gap: 10px;
+        }
+        .message-input textarea {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            resize: vertical;
+            min-height: 60px;
+        }
+        .message-input button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .message-input button:hover {
+            background-color: #218838;
+        }
+        .messages-container {
+            display: flex;
+            gap: 20px;
+        }
+        .messages-box {
+            flex: 1;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: white;
+            min-height: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .messages-box h3 {
+            margin-top: 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 5px;
+        }
+        .received {
+            background-color: #f1f0f0;
+            align-self: flex-start;
+        }
+        .sent {
+            background-color: #d4edda;
+            align-self: flex-end;
+            text-align: right;
+        }
+        .message .header {
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .message .content {
+            word-break: break-word;
+        }
+        .debug-box {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+        .debug-box h3 {
+            margin-top: 0;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .csrf-test-form {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ffc107;
+            background-color: #fff3cd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Aplicação de Mensagens Seguras</h1>
+    
+    <div class="container">
+        <div class="user-select">
+            <button onclick="switchUser('user1')" id="btn-user1" class="active">Usuário 1</button>
+            <button onclick="switchUser('user2')" id="btn-user2">Usuário 2</button>
+        </div>
+
+        <div class="message-area">
+            <div class="form-group">
+                <label for="encryption-key">Chave de Criptografia:</label>
+                <input type="text" id="encryption-key" placeholder="Digite a chave de criptografia compartilhada" value="chaveSegretaCompartilhada123">
+            </div>
+
+            <div class="message-input">
+                <textarea id="message-input" placeholder="Digite sua mensagem aqui..."></textarea>
+                <button onclick="sendMessage()">Enviar</button>
+            </div>
+
+            <div class="messages-container">
+                <div class="messages-box">
+                    <h3>Mensagens Recebidas</h3>
+                    <div id="received-messages"></div>
+                </div>
+                <div class="messages-box">
+                    <h3>Mensagens Enviadas</h3>
+                    <div id="sent-messages"></div>
+                </div>
+            </div>
+            
+            <div class="debug-box">
+                <h3>Informações de Debug</h3>
+                <div>
+                    <strong>Usuário Atual:</strong> <span id="current-user">user1</span>
+                </div>
+                <div>
+                    <strong>Token CSRF:</strong> <span id="csrf-token"></span>
+                </div>
+                <div>
+                    <strong>Última Mensagem Criptografada:</strong>
+                    <pre id="encrypted-message" style="word-wrap: break-word;"></pre>
+                </div>
+            </div>
+
+            <div class="csrf-test-form">
+                <h3>Teste de Proteção CSRF</h3>
+                <p>Este formulário simula um ataque CSRF:</p>
+                <form id="csrf-attack-form">
+                    <div class="form-group">
+                        <label for="csrf-message">Mensagem de Ataque:</label>
+                        <input type="text" id="csrf-message" value="Esta é uma mensagem maliciosa!">
+                    </div>
+                    <button type="button" onclick="simulateCsrfAttack()">Simular Ataque CSRF</button>
+                </form>
+                <div id="csrf-result" style="margin-top: 10px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
